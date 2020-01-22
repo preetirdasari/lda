@@ -1,0 +1,121 @@
+---
+title: "LDA Classifier"
+author: "Preeti R Dasari"
+date: "10/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+library(ggplot2) # A library to generate high-quality graphs
+library(dplyr) # A library for data manipulation
+library(gridExtra) # Provides a number of user-level functions to work with "grid" graphics, notably to arrange multiple grid-based plots on a page, and draw tables
+#set.seed(1)
+library(MASS)
+```
+
+### Required Packages 
+
+```{r, eval=FALSE}
+set.seed(1)
+library(ggplot2) # For Data Visualization
+library(dplyr) # For Data Manipulation
+library(gridExtra)
+library(MASS)
+```
+
+### Linear Discriminant Analysis Parameters
+
+
+```{r}
+n          =     1000
+p          =     2
+X          =     matrix(ncol = p, nrow = n)
+p1         =     0.4       # probability of class 1
+o          =     0.5       # sigma
+rho1       =     0.9       # correlation coefficient of class 1
+rho0       =     -0.7      # correlation coefficient of class 0
+o1         =     0.6       # sigma of class 1
+o2         =     0.4       # sigma of class 0
+C1         =     o1^2 * matrix(c(1, rho1, rho1, 1), nrow = 2)     # covariance matrix of class 1
+C0         =     o2^2 * matrix(c(1, rho0, rho0, 1), nrow = 2)     # covariance matrix of class 0
+mu1        =     c(-5,1)/sqrt(2)     # mean of class 1
+mu0        =     c(3,-1)/sqrt(2)     # mean of class 0
+
+```
+
+### Data Generation
+
+```{r}
+y          =     as.factor(rbinom(n, 1, p1))    # Generating categorical variables
+
+for (i in 1:n){
+  mu     =     (y[i]==1)*mu1 + (y[i]==0)*mu0
+  C      =     (y[i]==1)*C1 + (y[i]==0)*C0
+  X[i,]  =     mvrnorm(1, mu, C) 
+}
+
+```
+
+### Separating the features corresponding to 1 and 0
+
+```{r}
+
+X1        =   X[y==1,]
+X0        =   X[y==0,]
+
+
+mu1.hat   =   colMeans(X1)    # Predicted labels for class 1
+mu0.hat   =   colMeans(X0)    # Predicted labels for class 0
+```
+
+### Estimating Parameters
+
+```{r}
+n1        =   sum(y==1)
+n0        =   sum(y==0)
+p1.hat    =   n1/n
+p0.hat    =   1 - p1.hat
+
+X1        =   X1 - mu1.hat
+X0        =   X0 - mu0.hat
+
+C.hat     =   cov(rbind(X1,X0))
+
+beta.hat  =  solve(C.hat) %*% (mu1.hat-mu0.hat)
+beta0.hat =  -0.5* mu1.hat %*% solve(C.hat) %*% mu1.hat + 0.5* mu0.hat %*% solve(C.hat) %*% mu0.hat + log(p1.hat/p0.hat)
+
+```
+
+
+### Grid Expansion
+
+Creating a 100 x 100 grid to cover the range of parameters and labeling each point using LDA function. 
+
+```{r}
+X.grid     =     expand.grid(x=seq(from = min(X[,1]), to =  max(X[,1]), length.out = 100), 
+                              y=seq(from = min(X[,2]), to =  max(X[,2]), length.out = 100))
+
+y.hat.grid =     as.matrix(X.grid) %*% beta.hat + as.vector(beta0.hat)
+y.hat.grid =     (y.hat.grid > 0) * 1;
+
+```
+
+
+### Plotting Train and Predicted Data
+
+```{r}
+data.train    =     data.frame(y, X)
+data.pred     =     data.frame( X.grid, y.hat.grid)
+
+
+p1         =     ggplot(data.train, aes(x=X1, y=X2, colour=y))+geom_point()+ggtitle("Train Data")
+p3         =     ggplot(data.pred, aes(x=x, y=y, colour=y.hat.grid))+geom_point()+ggtitle("Predicted Label")
+
+grid.arrange(p1,  p3, nrow =1) 
+```
+
